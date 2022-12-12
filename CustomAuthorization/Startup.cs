@@ -14,6 +14,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using JWTAuthentication.Helpers;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace JWTAuthentication
 {
@@ -29,6 +32,20 @@ namespace JWTAuthentication
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = Configuration["Jwt:Issuer"],
+                        ValidAudience = Configuration["Jwt:Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["Jwt:Key"]))
+                    };
+                });
             services.AddCors();
             services.AddControllers();
             services.AddDbContext<UserContext>
@@ -52,6 +69,7 @@ namespace JWTAuthentication
             app.UseHttpsRedirection();
 
             app.UseRouting();
+            app.UseAuthentication();
             app.UseCors(options => options
             //options should be modified to our needs
             .WithOrigins("http://localhost:3000")

@@ -5,7 +5,9 @@ using JWTAuthentication.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Linq;
 using System.Net.Http;
+using System.Security.Claims;
 
 namespace JWTAuthentication.Controllers
 {
@@ -34,7 +36,7 @@ namespace JWTAuthentication.Controllers
             };
             return Created("success", _repo.Create(user));
         }
-        //First Action -- Where JWT token is created
+        //      First Action -- Where JWT token is created
         [HttpPost(template:"login")]
         public IActionResult Login(LoginDto dto)
         {
@@ -49,34 +51,56 @@ namespace JWTAuthentication.Controllers
             {
                 return BadRequest(new { message = "Invalid credentials" });
             }
-
-            var jwt = _jwtService.Generate(user.Id);
-            Response.Cookies.Append("jwt", jwt, new CookieOptions()
-            {
-                HttpOnly = true
-            });
-
-            return Ok(new {message = "success"});
+            var jwt = _jwtService.Generate(user);
+            //Response.Cookies.Append("jwt", jwt, new CookieOptions()
+            //{
+            //    HttpOnly = true
+            //});
+            return Ok(jwt);
         }
 
         // Second Action -- Passing this generated token as a cookie
-        [HttpGet(template: "user")]
-        public new IActionResult User()
+        //[HttpGet(template: "user")]
+        //public new IActionResult User()
+        //{
+        //    try
+        //    {
+        //        var jwt = Request.Cookies["jwt"];
+        //        var token = _jwtService.Verify(jwt);
+        //        int userId = int.Parse(token.Issuer);
+        //        var user = _repo.GetById(userId);
+        //        return Ok(user);
+        //    }
+        //    catch (Exception)
+        //    {
+        //        return Unauthorized();
+        //    }
+        //}
+
+
+        // Check for token but not in cookie (second version)
+        [HttpGet(template:"check")]
+        public IActionResult OnlyForAuthenticatedUsersMethod()
         {
-            try
+            var identity = HttpContext.User.Identity as ClaimsIdentity;
+            if (identity != null)
             {
-                var jwt = Request.Cookies["jwt"];
-                var token = _jwtService.Verify(jwt);
+                try
+                {
+                    var userClaims = identity.Claims;
+                    var currentUser = new LoginDto()
+                    {
+                        Username = userClaims.FirstOrDefault(u => u.Type == ClaimTypes.NameIdentifier).Value,
+                    };
+                    return Ok($"Hey {currentUser.Username}, you are authenticated, well done");
+                }
+                catch (Exception)
+                {
 
-                int userId = int.Parse(token.Issuer);
-
-                var user = _repo.GetById(userId);
-                return Ok(user);
+                    return Unauthorized(new { message = "You are not authenticated, sorry!" });
+                }
             }
-            catch (Exception)
-            {
-                return Unauthorized();
-            }
+            return Unauthorized();
         }
 
         [HttpPost("logout")]
